@@ -6,153 +6,172 @@ import java.util.List;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.message.BasicNameValuePair;
-import org.apache.http.protocol.BasicHttpContext;
-import org.apache.http.protocol.HttpContext;
 
-import de.keyboardsurfer.android.widget.crouton.Crouton;
-import de.keyboardsurfer.android.widget.crouton.Style;
-import android.os.AsyncTask;
-import android.os.Bundle;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
-import android.view.Menu;
+import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.View;
-import android.widget.CheckBox;
+import android.view.View.OnClickListener;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
-	EditText nombre;
-	EditText apellido;
-	CheckBox modo;
-	EditText edad;
+
+	Button b;
+	EditText et, pass;
+	TextView tv;
+	HttpPost httppost;
+	StringBuffer buffer;
+	HttpResponse response;
+	HttpClient httpclient;
+	List<NameValuePair> nameValuePairs;
+	ProgressDialog dialog = null;
 
 	@Override
-	protected void onCreate(Bundle savedInstanceState) {
+	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		nombre = (EditText) findViewById(R.id.et_nombre);
-		apellido = (EditText) findViewById(R.id.et_apellido);
-		edad = (EditText) findViewById(R.id.et_edad);
-		modo = (CheckBox) findViewById(R.id.ck_modo);
+		b = (Button) findViewById(R.id.Button01);
+		et = (EditText) findViewById(R.id.username);
+		pass = (EditText) findViewById(R.id.password);		
+
+		b.setOnClickListener(new OnClickListener() {
+			@Override
+			public void onClick(View v) {
+				dialog = ProgressDialog.show(MainActivity.this, "",
+						"Validando Usuario...", true);
+				new Thread(new Runnable() {
+					public void run() {
+						login();
+					}
+				}).start();
+			}
+		});
 	}
 
-	// invoca la nueva actividad
-	public void listadoOnClick(View view) {
-		startActivity(new Intent(this, ListadoActivity.class));
-
-	}
-
-	// metodo que va en el boton agregar
-	public void EnviarOnClik(View view) {
-		if (nombre.getText().toString().trim().equals("")) {
-			nombre.setError("Debe ingresar un nombre Válido");
-
-		} else if (apellido.getText().toString().trim().equals("")) {
-
-			apellido.setError("Debe ingresar un apellido Válido");
-
-		} else if (edad.getText().toString().trim().equals("")) {
-			edad.setError("Debe Rellenar este campo");
-
-		} else {
-			// ejecuta el asyntask el cual añade los datos.
-			new MiTarea().execute("");
-		}
-	}
-
-	public String enviarPost(String nombre, String apellido, String edad) {
-
-		HttpClient httpClient = new DefaultHttpClient();
-		HttpContext localContext = new BasicHttpContext();
-		HttpPost httpPost = new HttpPost(
-				"http://192.168.0.13/putandget/putdata.php");			
-		HttpResponse response = null;
+	void login() {
 		try {
-			List<NameValuePair> params = new ArrayList<NameValuePair>(3);
-			params.add(new BasicNameValuePair("nombre", nombre));
-			params.add(new BasicNameValuePair("apellido", apellido));
-			params.add(new BasicNameValuePair("edad", edad));
-			params.add(new BasicNameValuePair("modo", "POST"));
-			httpPost.setEntity(new UrlEncodedFormEntity(params));
-			response = httpClient.execute(httpPost, localContext);
+
+			httpclient = new DefaultHttpClient();
+			// Cambiar la ruta por la que tienen los documentos en php
+			httppost = new HttpPost("http://192.168.0.10/putandget/check.php");
+			// add your data
+			nameValuePairs = new ArrayList<NameValuePair>(2);
+			// Always use the same variable name for posting i.e the android
+			// side variable name and php side variable name should be similar,
+			nameValuePairs.add(new BasicNameValuePair("username", et.getText()
+					.toString().trim().toUpperCase())); // $Edittext_value =
+														// $_POST['Edittext_value'];
+			nameValuePairs.add(new BasicNameValuePair("password", pass
+					.getText().toString().trim().toUpperCase()));
+			httppost.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+			// Execute HTTP Post Request
+			response = httpclient.execute(httppost);
+			// edited by James from coderzheaven.. from here....
+			ResponseHandler<String> responseHandler = new BasicResponseHandler();
+			final String response = httpclient.execute(httppost,
+					responseHandler);
+			System.out.println("Response : " + response);
+			runOnUiThread(new Runnable() {
+				public void run() {
+					// tv.setText("Response from PHP : " + response);
+					dialog.dismiss();
+					et.setText("");
+					pass.setText("");
+				}
+			});
+
+			if (response.equalsIgnoreCase("User Found")) {
+				runOnUiThread(new Runnable() {
+					public void run() {
+						Toast.makeText(MainActivity.this, R.string.Ingreso_exito,
+								Toast.LENGTH_SHORT).show();
+					}
+				});
+
+				Intent act = new Intent(this, AddActivity.class);
+				startActivity(act);
+
+			} else {
+				showAlert();
+			}
 
 		} catch (Exception e) {
-			// TODO: handle exception
+			dialog.dismiss();
+			System.out.println("Exception : " + e.getMessage());
 		}
-
-		return response.toString();
 	}
 
-	public String enviarGet(String nombre, String apellido, String edad) {
-		HttpClient httpClient = new DefaultHttpClient();
-		HttpContext localContext = new BasicHttpContext();
-		HttpResponse response = null;
-		String parametros = "?nombre=" + nombre + "&apellido=" + apellido
-				+ "&edad=" + edad + "&modo=GET";
-
-		HttpGet httpget = new HttpGet(
-				"http://192.168.0.13/putandget/putdata.php" + parametros);
-		try {
-			response = httpClient.execute(httpget, localContext);
-
-		} catch (Exception e) {
-
-		}
-		return response.toString();
+	public void showAlert() {
+		MainActivity.this.runOnUiThread(new Runnable() {
+			public void run() {
+				AlertDialog.Builder builder = new AlertDialog.Builder(
+						MainActivity.this);
+				builder.setTitle(R.string.Login_error);
+				builder.setMessage(R.string.Login_error_mensaje)
+						.setCancelable(false)
+						.setPositiveButton("Ok",
+								new DialogInterface.OnClickListener() {
+									public void onClick(DialogInterface dialog,
+											int id) {
+									}
+								});
+				AlertDialog alert = builder.create();
+				alert.show();
+			}
+		});
 	}
 
 	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.main, menu);
-		return true;
-	}
+	public boolean onKeyDown(int keyCode, KeyEvent event) {
+		if (keyCode == KeyEvent.KEYCODE_BACK && event.getRepeatCount() == 0) {
+			// do something on back.
+			AlertDialog.Builder alertDialog = new AlertDialog.Builder(
+					MainActivity.this);
 
-	// Tarea asincrona...
-	public class MiTarea extends AsyncTask<String, Void, String> {
+			// Setting Dialog Title
+			alertDialog.setTitle(R.string.Salir);
+			// Setting Dialog Message
+			alertDialog
+					.setMessage(R.string.Salir_mensaje);
+			// Setting Icon to Dialog
+			alertDialog.setIcon(android.R.drawable.ic_dialog_alert);
+			
+			// Setting Positive "Yes" Button
+			alertDialog.setPositiveButton(R.string.Si_btn,
+					new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							// Write your code here to invoke YES event
+							finish();
+						}
+					});
 
-		@Override
-		// ejecuta con preExceute todo antes de hacer do in background
-		protected void onPreExecute() {
-			// TODO Auto-generated method stub
-			super.onPreExecute();
+			// "NO" Button
+			alertDialog.setNegativeButton(R.string.No_btn,
+					new DialogInterface.OnClickListener() {
+						public void onClick(DialogInterface dialog, int which) {
+							// Write your code here to invoke NO event
+							dialog.cancel();
+						}
+					});
+		
+			// Showing Alert Message
+			alertDialog.show();
 		}
 
-		// ejecuta una tarea en segundo plano
-		protected String doInBackground(String... params) {
-			// TODO Auto-generated method st
-			// System.out.println("Background");
-			final String res;
-
-			if (modo.isChecked()) {
-
-				res = enviarGet(nombre.getText().toString(), apellido.getText()
-						.toString(), edad.getText().toString());
-
-			} else {
-				res = enviarPost(nombre.getText().toString(), apellido
-						.getText().toString(), edad.getText().toString());
-			}
-
-			return null;
-
-		}
-
-		// se ejecuta una vez termina onPreExcecute
-
-		protected void onPostExecute(String algo) {
-			System.out.println("post");
-			Crouton.showText(MainActivity.this, R.string.registro_exito,
-					Style.CONFIRM);
-			nombre.setText("");
-			apellido.setText("");
-			edad.setText("");
-		}
+		return super.onKeyDown(keyCode, event);
 	}
 }

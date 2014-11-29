@@ -48,7 +48,7 @@ public class ListadoActivity extends Activity {
 	public String leer(){
 		HttpClient cliente =new DefaultHttpClient();
 		HttpContext contexto = new BasicHttpContext();
-		HttpGet httpget = new HttpGet("http://192.168.0.13/putandget/getdata.php");
+		HttpGet httpget = new HttpGet("http://192.168.0.10/putandget/getdata.php");
 		String resultado=null;
 		try {
 			HttpResponse response = cliente.execute(httpget,contexto);
